@@ -1,11 +1,11 @@
 import json
-
 import telebot
 import sqlite3
 import time
 import qiwi_pay
 import requests
 
+from openpyxl import Workbook
 
 # BOT
 TOKEN = "1882373929:AAH2-5P43H0EELZ3IKXge9yBiXWprKa8uzg"
@@ -28,6 +28,11 @@ quantity_send_message = {}
 # for stop spam
 stop_spam = {}
 
+# text for posted
+text_for_post = ""
+
+col_btn_on_post = {}
+
 # Check subs on channel
 def check_subs(id):
     if id == 779917069:
@@ -38,7 +43,7 @@ def check_subs(id):
         return False
 
 # add user to db
-def add_to_db(id):
+def add_to_db(id, username):
     conn = sqlite3.connect("user.db")
     cursor = conn.cursor()
 
@@ -48,7 +53,7 @@ def add_to_db(id):
         lis_id.append(x[0])
 
     if id not in lis_id:
-        cursor.execute("INSERT INTO `users` VALUES (?,?,?,?,?)", (id, "", 0, 0, 0))
+        cursor.execute("INSERT INTO `users` VALUES (?,?,?,?)", (id, "", 0, 0, username))
     conn.commit()
 
 # update time users when he started spam
@@ -144,3 +149,21 @@ def new(url):
     answ = session.post(urls, post)
     ret_url = json.loads(answ.content)
     return ret_url["short_url"].replace("\\", "")
+
+def get_all_id():
+    conn = sqlite3.connect("user.db")
+    cursor = conn.cursor()
+    all_id = cursor.execute("SELECT `id` FROM `users`").fetchall()
+    id_lis = []
+    for id in all_id:
+        id_lis.append(id[0])
+
+    return id_lis
+
+def save_to_excel():
+    wb = Workbook()
+    ws = wb.active
+    all_id = get_all_id()
+    for elem in all_id:
+        ws.append([elem])
+    wb.save("send_id.xlsx")

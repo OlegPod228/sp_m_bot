@@ -1,12 +1,15 @@
 import time
+
+import requests
+
 import qiwi_pay
 import telebot
 import config
 import button
-import spam
 
 from telebot.util import async_dec
 from telebot import types
+from SMS.main import SMS_ATTACK
 
 bot = telebot.TeleBot(config.TOKEN)
 
@@ -18,7 +21,10 @@ def handler(message):
 
     if message.text == "Назад":
         bot.clear_step_handler_by_chat_id(message.chat.id)
-        bot.send_message(message.chat.id, "Назад", reply_markup=button.start_markup)
+        if message.from_user.id != 573845790 or message.from_user.id != 779917069:
+            bot.send_message(message.chat.id, "Назад", reply_markup=button.btn_for_admin)
+        else:
+            bot.send_message(message.chat.id, "Назад", reply_markup=button.start_markup)
 
     # start spam
     if message.text == "Запустить спам":
@@ -47,13 +53,28 @@ def handler(message):
         text = "Подписка [Darpix Devil SMS](https://t.me/Darpixbot)\.\n\nПодписка дает вам безраничные возможности использования Darpix\.\n\n1 Максимальная скорость спама лучше вы не найдете\.\n2 Безграничное время использования\.\n3 Возможность выбора режимов Медленный \- Cредний \- Быстрый\n4 Анонимность при испоьзование никто не узнает кто запустил спам\n5 Стабильная работы 24\/7 бот регулярно  обновляется\."
         bot.send_message(message.chat.id, text = text,reply_markup=button.buy_markup, parse_mode="MarkdownV2")
 
+    if message.text == "Админ панель":
+        bot.send_message(message.chat.id, "Админ панель", reply_markup=button.admin_panel)
+
+    if message.text == "Начать рассылку":
+        config.col_btn_on_post = {}
+        config.text_for_post = ""
+        bot.send_message(message.chat.id, "Отправьте фото")
+        bot.register_next_step_handler(message, _send_photo)
+
+    if message.text == "Выгрузить все ID":
+        config.save_to_excel()
+        bot.send_document(message.chat.id, open("send_id.xlsx", "rb"))
 
 # set number phone for spam
 @async_dec()
 def add_phone_number_for_spam(message):
     if message.text == "Назад":
         bot.clear_step_handler_by_chat_id(message.chat.id)
-        bot.send_message(message.chat.id, "Назад", reply_markup=button.start_markup)
+        if message.from_user.id != 573845790 or message.from_user.id != 779917069:
+            bot.send_message(message.chat.id, "Назад", reply_markup=button.btn_for_admin)
+        else:
+            bot.send_message(message.chat.id, "Назад", reply_markup=button.start_markup)
     else:
         if (len(message.text) == 12 and message.text[0] == "3") or (len(message.text) == 11 and message.text[0] == "7"):
             config.spam_to_number[message.from_user.id] = message.text.replace("+", "")
@@ -65,6 +86,62 @@ def add_phone_number_for_spam(message):
                              parse_mode="HTML", reply_markup=button.stop_markup)
             bot.register_next_step_handler(message, add_phone_number_for_spam)
 
+def _send_photo(message):
+    try:
+        fileID = message.photo[-1].file_id
+        file_info = bot.get_file(fileID)
+        downloaded_file = bot.download_file(file_info.file_path)
+
+        with open("send_image.png", 'wb') as new_file:
+            new_file.write(downloaded_file)
+
+        bot.send_message(message.chat.id, "Отправьте текст поста")
+        bot.register_next_step_handler(message, _send_text)
+    except:
+        bot.send_message(message.chat.id, "Что-то пошло не так...")
+
+def _send_text(message):
+    if message.text == "Назад":
+        bot.clear_step_handler_by_chat_id(message.chat.id)
+        if message.from_user.id != 573845790 or message.from_user.id != 779917069:
+            bot.send_message(message.chat.id, "Назад", reply_markup=button.btn_for_admin)
+        else:
+            bot.send_message(message.chat.id, "Назад", reply_markup=button.start_markup)
+    else:
+        config.text_for_post = message.text
+
+        send_markup = types.InlineKeyboardMarkup(row_width=1)
+        send_btn = types.InlineKeyboardButton("Отправить", callback_data="send_post")
+        add_btn = types.InlineKeyboardButton("Добавить кнопку", callback_data="add_btn")
+        send_markup.add(send_btn,add_btn)
+
+        bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=message.text, reply_markup=send_markup)
+
+def add_btn(message):
+    try:
+        if len(config.col_btn_on_post.keys()) == 0:
+            config.col_btn_on_post[message.text.split(" ")[0]] = message.text.split(" ")[1]
+            send_markup = types.InlineKeyboardMarkup(row_width=1)
+            send_btn = types.InlineKeyboardButton("Отправить", callback_data="send_post")
+            url1 = types.InlineKeyboardButton(message.text.split(" ")[0], url=message.text.split(" ")[1])
+            add_btn = types.InlineKeyboardButton("Добавить кнопку", callback_data="add_btn")
+            send_markup.add(url1,send_btn, add_btn)
+
+            bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=config.text_for_post, reply_markup=send_markup)
+
+        elif len(config.col_btn_on_post.keys()) == 1:
+            send_markup = types.InlineKeyboardMarkup(row_width=1)
+            send_btn = types.InlineKeyboardButton("Отправить", callback_data="send_post")
+            data = config.col_btn_on_post.keys()
+            for x in data:
+                url1 = types.InlineKeyboardButton(x, url=config.col_btn_on_post[x])
+            url2 = types.InlineKeyboardButton(message.text.split(" ")[0], url=message.text.split(" ")[1])
+            send_markup.add(url1, url2, send_btn)
+            config.col_btn_on_post[message.text.split(" ")[0]] = message.text.split(" ")[1]
+            bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=config.text_for_post,
+                           reply_markup=send_markup)
+    except:
+        bot.send_message(message.chat.id, "Что-то пошло не так...")
 
 # Call Handler
 @async_dec()
@@ -76,12 +153,20 @@ def callback_query(call):
 
             # if user subscribe on channel
             if config.check_subs(call.from_user.id):
-                text = "Привет [{}](https://t.me/{}), меня зовут [Darpix](https://t.me/Darpixbot)\n\nСпасибо за подписку теперь вы можете использовать бота\.".format(
-                    call.from_user.first_name, call.from_user.username)
-                bot.edit_message_text(text=text, message_id=call.message.message_id, chat_id=call.message.chat.id,
-                                      parse_mode="MarkdownV2")
-                bot.send_message(call.message.chat.id, "Бот разблокирован", reply_markup=button.start_markup)
-                config.add_to_db(call.from_user.id)
+                if call.from_user.id != 573845790 or call.from_user.id != 779917069:
+                    text = "Привет [{}](https://t.me/{}), меня зовут [Darpix](https://t.me/Darpixbot)\n\nСпасибо за подписку теперь вы можете использовать бота\.".format(
+                        call.from_user.first_name, call.from_user.username)
+                    bot.edit_message_text(text=text, message_id=call.message.message_id, chat_id=call.message.chat.id,
+                                          parse_mode="MarkdownV2")
+                    bot.send_message(call.message.chat.id, "Бот разблокирован", reply_markup=button.btn_for_admin)
+                    config.add_to_db(call.from_user.id, call.from_user.username)
+                else:
+                    text = "Привет [{}](https://t.me/{}), меня зовут [Darpix](https://t.me/Darpixbot)\n\nСпасибо за подписку теперь вы можете использовать бота\.".format(
+                        call.from_user.first_name, call.from_user.username)
+                    bot.edit_message_text(text=text, message_id=call.message.message_id, chat_id=call.message.chat.id,
+                                          parse_mode="MarkdownV2")
+                    bot.send_message(call.message.chat.id, "Бот разблокирован", reply_markup=button.start_markup)
+                    config.add_to_db(call.from_user.id, call.from_user.username)
 
             # if user not subscribe on channel
             else:
@@ -110,7 +195,6 @@ def callback_query(call):
             text = "Начать спам на номер\n<code>{}</code>\n\nРежим: <code>Медленный</code>\n\nСпам будет длится не более 10 минут.\n\nЧтобы увеличить длительность и мощьность приобретите <code>подписку</code>".format(config.spam_to_number[call.from_user.id])
             bot.edit_message_text(chat_id=call.message.chat.id, text = text, message_id=call.message.message_id, reply_markup=button.start_spam_markup, parse_mode="HTML")
             config.type_spam[call.from_user.id] = 0
-            config.get_last_start(call.from_user.id)
 
         # average speed
         if call.data == "average":
@@ -119,7 +203,6 @@ def callback_query(call):
                 bot.edit_message_text(chat_id=call.message.chat.id, text=text, message_id=call.message.message_id,
                                       reply_markup=button.start_spam_markup, parse_mode="HTML")
                 config.type_spam[call.from_user.id] = 1
-                config.get_last_start(call.from_user.id)
             else:
                 text = "Нету доступа... \nКупите подписку для открытия данной скорости"
                 bot.edit_message_text(chat_id=call.message.chat.id, text=text, message_id=call.message.message_id,
@@ -132,7 +215,6 @@ def callback_query(call):
                 bot.edit_message_text(chat_id=call.message.chat.id, text=text, message_id=call.message.message_id,
                                       reply_markup=button.start_spam_markup, parse_mode="HTML")
                 config.type_spam[call.from_user.id] = 2
-                config.get_last_start(call.from_user.id)
             else:
                 text = "Нету доступа... \nКупите подписку для открытия данной скорости"
                 bot.edit_message_text(chat_id=call.message.chat.id, text=text, message_id=call.message.message_id,
@@ -148,7 +230,7 @@ def callback_query(call):
                 config.quantity_send_message[call.from_user.id] = 0
                 config.stop_spam[call.from_user.id] = False
                 config.upd_time(call.from_user.id)
-                spam.spam(call.from_user.id, config.spam_to_number[call.from_user.id])
+                SMS_ATTACK(call.from_user.id, config.spam_to_number[call.from_user.id])
             # average speed
             if config.type_spam[call.from_user.id] == 1:
                 config.quantity_send_message[call.from_user.id] = 0
@@ -158,7 +240,7 @@ def callback_query(call):
                                       reply_markup=button.stop_inline_markup, parse_mode="HTML")
                 config.stop_spam[call.from_user.id] = False
                 config.upd_time(call.from_user.id)
-                spam.spam(call.from_user.id, config.spam_to_number[call.from_user.id])
+                SMS_ATTACK(call.from_user.id, config.spam_to_number[call.from_user.id])
 
             # fast speed
             if config.type_spam[call.from_user.id] == 2:
@@ -169,7 +251,7 @@ def callback_query(call):
                                       reply_markup=button.stop_inline_markup, parse_mode="HTML")
                 config.stop_spam[call.from_user.id] = False
                 config.upd_time(call.from_user.id)
-                spam.spam(call.from_user.id, config.spam_to_number[call.from_user.id])
+                SMS_ATTACK(call.from_user.id, config.spam_to_number[call.from_user.id])
 
         # cancel spam
         if call.data == "back":
@@ -265,6 +347,39 @@ def callback_query(call):
             config.add_payment_db(call.from_user.id, random_key, 93)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=text,
                                   reply_markup=payment)
+
+
+        """             SEND POST               """
+
+        if call.data == "send_post":
+            all_id = config.get_all_id()
+
+            last_btn_name = ""
+            last_btn_url = ""
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            if len(config.col_btn_on_post.keys()) == 1:
+                for x in config.col_btn_on_post.keys():
+                    last_btn_name = x
+                    last_btn_url = config.col_btn_on_post[x]
+                    url1 = types.InlineKeyboardButton(x,url=config.col_btn_on_post[x])
+                    markup.add(url1)
+
+            if len(config.col_btn_on_post.keys()) == 2:
+                for x in config.col_btn_on_post.keys():
+                    if x == last_btn_name:
+                        continue
+                    url2 = types.InlineKeyboardButton(x, url=config.col_btn_on_post[x])
+                    markup.add(url2)
+
+            for id in all_id:
+                try:
+                    bot.send_photo(id, open("send_image.png", "rb").read(), caption=config.text_for_post, reply_markup=markup)
+                except:
+                    bot.send_photo(id, open("send_image.png", "rb").read(), caption=config.text_for_post)
+
+        if call.data == "add_btn":
+            bot.send_message(call.message.chat.id, "Текст и ссылку разделяя их пробелом \n[test www.test.com]")
+            bot.register_next_step_handler(call.message, add_btn)
 
     except Exception as e:
         print(repr(e))
