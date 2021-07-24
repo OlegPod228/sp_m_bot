@@ -1,7 +1,4 @@
 import time
-
-import requests
-
 import qiwi_pay
 import telebot
 import config
@@ -9,7 +6,8 @@ import button
 
 from telebot.util import async_dec
 from telebot import types
-from SMS.main import SMS_ATTACK
+
+import spam
 
 bot = telebot.TeleBot(config.TOKEN)
 
@@ -59,12 +57,54 @@ def handler(message):
     if message.text == "Начать рассылку":
         config.col_btn_on_post = {}
         config.text_for_post = ""
-        bot.send_message(message.chat.id, "Отправьте фото")
-        bot.register_next_step_handler(message, _send_photo)
+        bot.send_message(message.chat.id, "Выберите тип поста",reply_markup=button.post_send)
 
     if message.text == "Выгрузить все ID":
         config.save_to_excel()
         bot.send_document(message.chat.id, open("send_id.xlsx", "rb"))
+
+    if message.text == "Пост с фото":
+        bot.send_message(message.chat.id, "Отправьте мне фото")
+        config.photo_post = True
+        config.video_post = False
+        config.gif_post = False
+        config.sticker_post = False
+        bot.register_next_step_handler(message, _send_photo)
+
+
+
+    if message.text == "Пост без фото":
+        bot.send_message(message.chat.id, "Отправьте мне текст")
+        config.photo_post = False
+        config.video_post = False
+        config.gif_post = False
+        config.sticker_post = False
+        bot.register_next_step_handler(message, _send_text)
+
+    if message.text == "Пост с видео":
+        bot.send_message(message.chat.id, "Отправьте мне видео")
+        config.video_post = True
+        config.photo_post = False
+        config.gif_post = False
+        config.sticker_post = False
+        bot.register_next_step_handler(message, _send_video)
+
+    if message.text == "Пост с гифкой":
+        config.gif_post = True
+        config.photo_post = False
+        config.video_post = False
+        config.sticker_post = False
+        bot.send_message(message.chat.id, "Отправьте мне гифку")
+        bot.register_next_step_handler(message, _send_gif)
+
+    if message.text == "Переслать пост":
+        bot.send_message(message.chat.id, "Пришлите мне пост")
+        bot.register_next_step_handler(message, forward_message)
+
+
+    if message.text == "Статистика использования":
+        statistic = config.statistic_users()
+        bot.send_message(message.chat.id, statistic, parse_mode="HTML")
 
 # set number phone for spam
 @async_dec()
@@ -85,6 +125,24 @@ def add_phone_number_for_spam(message):
                              'Введите номер телефона без (+) на который будет отправлен спам. \n\nПример: <code>79993433765</code> ',
                              parse_mode="HTML", reply_markup=button.stop_markup)
             bot.register_next_step_handler(message, add_phone_number_for_spam)
+
+def _send_gif(message):
+    file_info = bot.get_file(message.document.file_id)
+    downloaded_file = bot.download_file(file_info.file_path)
+    with open("gif_send.mp4", 'wb') as new_file:
+        new_file.write(downloaded_file)
+
+    bot.send_message(message.chat.id, "Отправьте мне текст")
+    bot.register_next_step_handler(message, _send_text)
+
+def _send_video(message):
+    file_info = bot.get_file(message.video.file_id)
+    downloaded_file = bot.download_file(file_info.file_path)
+    with open("video_send.mp4", 'wb') as new_file:
+        new_file.write(downloaded_file)
+
+    bot.send_message(message.chat.id,"Отправьте мне текст")
+    bot.register_next_step_handler(message, _send_text)
 
 def _send_photo(message):
     try:
@@ -115,7 +173,28 @@ def _send_text(message):
         add_btn = types.InlineKeyboardButton("Добавить кнопку", callback_data="add_btn")
         send_markup.add(send_btn,add_btn)
 
-        bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=message.text, reply_markup=send_markup)
+        if config.photo_post:
+            bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=message.text, reply_markup=send_markup)
+        elif config.video_post:
+            bot.send_video(message.chat.id, open("video_send.mp4", "rb"), caption=message.text, reply_markup=send_markup)
+        elif config.gif_post:
+            bot.send_video(message.chat.id, open("gif_send.mp4","rb"), caption=message.text, reply_markup=send_markup)
+        else:
+            bot.send_message(message.chat.id, message.text, reply_markup=send_markup)
+
+
+
+def forward_message(message):
+    config.col_send = 0
+    config.start_time = time.strftime("%d.%m.20%y %H:%M:%S")
+    for id in config.get_all_id():
+        bot.forward_message(id, message.chat.id, message_id=message.message_id)
+        config.col_send += 1
+    config.end_time = time.strftime("%d.%m.20%y %H:%M:%S")
+    text = f"Начало рассылки: <code>{config.start_time}</code>\nКол-во доставленных сообщений: <code>{config.col_send}</code>\nКонец рассылки: <code>{config.end_time}</code>"
+    bot.send_message(message.chat.id, text, parse_mode="HTML")
+
+
 
 def add_btn(message):
     try:
@@ -127,7 +206,17 @@ def add_btn(message):
             add_btn = types.InlineKeyboardButton("Добавить кнопку", callback_data="add_btn")
             send_markup.add(url1,send_btn, add_btn)
 
-            bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=config.text_for_post, reply_markup=send_markup)
+            if config.photo_post:
+                bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=config.text_for_post,
+                               reply_markup=send_markup)
+            elif config.video_post:
+                bot.send_video(message.chat.id, open("video_send.mp4", "rb"), caption=config.text_for_post,
+                               reply_markup=send_markup)
+            elif config.gif_post:
+                bot.send_video(message.chat.id, open("gif_send.mp4", "rb"), caption=config.text_for_post,
+                               reply_markup=send_markup)
+            else:
+                bot.send_message(message.chat.id, config.text_for_post, reply_markup=send_markup)
 
         elif len(config.col_btn_on_post.keys()) == 1:
             send_markup = types.InlineKeyboardMarkup(row_width=1)
@@ -138,8 +227,18 @@ def add_btn(message):
             url2 = types.InlineKeyboardButton(message.text.split(" ")[0], url=message.text.split(" ")[1])
             send_markup.add(url1, url2, send_btn)
             config.col_btn_on_post[message.text.split(" ")[0]] = message.text.split(" ")[1]
-            bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=config.text_for_post,
-                           reply_markup=send_markup)
+
+            if config.photo_post:
+                bot.send_photo(message.chat.id, open("send_image.png", "rb").read(), caption=config.text_for_post,
+                               reply_markup=send_markup)
+            elif config.video_post:
+                bot.send_video(message.chat.id, open("video_send.mp4", "rb"), caption=config.text_for_post,
+                               reply_markup=send_markup)
+            elif config.gif_post:
+                bot.send_video(message.chat.id, open("gif_send.mp4", "rb"), caption=config.text_for_post,
+                               reply_markup=send_markup)
+            else:
+                bot.send_message(message.chat.id, config.text_for_post, reply_markup=send_markup)
     except:
         bot.send_message(message.chat.id, "Что-то пошло не так...")
 
@@ -230,7 +329,8 @@ def callback_query(call):
                 config.quantity_send_message[call.from_user.id] = 0
                 config.stop_spam[call.from_user.id] = False
                 config.upd_time(call.from_user.id)
-                SMS_ATTACK(call.from_user.id, config.spam_to_number[call.from_user.id])
+                spam.spam(call.from_user.id, config.spam_to_number[call.from_user.id])
+
             # average speed
             if config.type_spam[call.from_user.id] == 1:
                 config.quantity_send_message[call.from_user.id] = 0
@@ -240,7 +340,7 @@ def callback_query(call):
                                       reply_markup=button.stop_inline_markup, parse_mode="HTML")
                 config.stop_spam[call.from_user.id] = False
                 config.upd_time(call.from_user.id)
-                SMS_ATTACK(call.from_user.id, config.spam_to_number[call.from_user.id])
+                spam.spam(call.from_user.id, config.spam_to_number[call.from_user.id])
 
             # fast speed
             if config.type_spam[call.from_user.id] == 2:
@@ -251,7 +351,7 @@ def callback_query(call):
                                       reply_markup=button.stop_inline_markup, parse_mode="HTML")
                 config.stop_spam[call.from_user.id] = False
                 config.upd_time(call.from_user.id)
-                SMS_ATTACK(call.from_user.id, config.spam_to_number[call.from_user.id])
+                spam.spam(call.from_user.id, config.spam_to_number[call.from_user.id])
 
         # cancel spam
         if call.data == "back":
@@ -263,13 +363,6 @@ def callback_query(call):
         if call.data == "buy":
             text = "Подписка [Darpix Devil SMS](https://t.me/Darpixbot)\.\n\nПодписка дает вам безраничные возможности использования Darpix\.\n\n1 Максимальная скорость спама лучше вы не найдете\.\n2 Безграничное время использования\.\n3 Возможность выбора режимов Медленный \- Cредний \- Быстрый\n4 Анонимность при испоьзование никто не узнает кто запустил спам\n5 Стабильная работы 24\/7 бот регулярно  обновляется\."
             bot.edit_message_text(chat_id=call.message.chat.id, message_id= call.message.message_id, text = text, reply_markup=None,parse_mode="MarkdownV2")
-
-            # for payment
-            key = "48e7qUxn9T7RyYE1MVZswX1FRSbE6iyCj2gCRwwF3Dnh5XrasNTx3BGPiMsyXQFNKQhvukniQG8RTVhYm3iPv76mVvVLZ4eiRLXshG7ndEvAGfTMFnxyMPJQsj7uwM4tPU9xPhqGsP9AeTdQ4r6CRT3ygNXg7Zq9os4sPd1uDv39zQDuzKPvVVA5yMY1n"
-            random_key = qiwi_pay.generate_random_commment()
-            url_149 = f"https://oplata.qiwi.com/create?publicKey={key}&amount=149&comment={random_key}"
-            url_249 = f"https://oplata.qiwi.com/create?publicKey={key}&amount=249&comment={random_key}"
-            url_349 = f"https://oplata.qiwi.com/create?publicKey={key}&amount=349&comment={random_key}"
 
             # Keyboard
             payment = types.InlineKeyboardMarkup(row_width=1)
@@ -355,12 +448,10 @@ def callback_query(call):
             all_id = config.get_all_id()
 
             last_btn_name = ""
-            last_btn_url = ""
             markup = types.InlineKeyboardMarkup(row_width=1)
             if len(config.col_btn_on_post.keys()) == 1:
                 for x in config.col_btn_on_post.keys():
                     last_btn_name = x
-                    last_btn_url = config.col_btn_on_post[x]
                     url1 = types.InlineKeyboardButton(x,url=config.col_btn_on_post[x])
                     markup.add(url1)
 
@@ -371,15 +462,63 @@ def callback_query(call):
                     url2 = types.InlineKeyboardButton(x, url=config.col_btn_on_post[x])
                     markup.add(url2)
 
+            config.start_time = time.strftime("%d.%m.20%y %H:%M:%S")
+            config.col_send = 0
             for id in all_id:
                 try:
-                    bot.send_photo(id, open("send_image.png", "rb").read(), caption=config.text_for_post, reply_markup=markup)
+                    if config.photo_post:
+                        bot.send_photo(id, open("send_image.png", "rb").read(), caption=config.text_for_post, reply_markup=markup)
+                    elif config.video_post:
+                        bot.send_video(id, open("video_send.mp4", "rb"), caption=config.text_for_post,
+                                       reply_markup=markup)
+                    elif config.gif_post:
+                        bot.send_video(id, open("gif_send.mp4", "rb"), caption=config.text_for_post,
+                                       reply_markup=markup)
+                    else:
+                        bot.send_message(id, config.text_for_post,reply_markup=markup)
                 except:
-                    bot.send_photo(id, open("send_image.png", "rb").read(), caption=config.text_for_post)
+                    if config.photo_post:
+                        bot.send_photo(id, open("send_image.png", "rb").read(), caption=config.text_for_post, reply_markup=markup)
+                    elif config.video_post:
+                        bot.send_video(id, open("video_send.mp4", "rb"), caption=config.text_for_post,
+                                       reply_markup=markup)
+                    elif config.gif_post:
+                        bot.send_video(id, open("gif_send.mp4", "rb"), caption=config.text_for_post,
+                                       reply_markup=markup)
+                    else:
+                        bot.send_message(id, config.text_for_post, reply_markup=markup)
+                config.col_send += 1
+
+            config.end_time = time.strftime("%d.%m.%y %H:%M:%S")
+
+            if config.photo_post:
+                bot.send_photo(call.from_user.id, open("send_image.png", "rb").read(), caption=config.text_for_post, reply_markup=button.view_stat_markup)
+            elif config.video_post:
+                bot.send_video(call.message.chat.id, open("video_send.mp4", "rb"), caption=config.text_for_post,
+                               reply_markup=button.view_stat_markup)
+            elif config.gif_post:
+                bot.send_video(call.message.chat.id, open("gif_send.mp4", "rb"), caption=config.text_for_post,
+                               reply_markup=button.view_stat_markup)
+            else:
+                bot.send_message(call.from_user.id, config.text_for_post, reply_markup=button.view_stat_markup)
 
         if call.data == "add_btn":
             bot.send_message(call.message.chat.id, "Текст и ссылку разделяя их пробелом \n[test www.test.com]")
             bot.register_next_step_handler(call.message, add_btn)
+
+        if call.data == "view_stat":
+            if len(config.statistic_post.keys()) > 0:
+                try:
+                    text = f"Начало рассылки: <code>{config.statistic_post[call.message.message_id]['start_time']}</code>\nКол-во отправленных сообщений: <code>{config.statistic_post[call.message.message_id]['col_send']}</code>\nКонец рассылки: <code>{config.statistic_post[call.message.message_id]['end_time']}</code>"
+                    bot.send_message(call.message.chat.id, text, parse_mode="HTML")
+                except:
+                    text = f"Начало рассылки: <code>{config.start_time}</code>\nКол-во доставленных сообщений: <code>{config.col_send}</code>\nКонец рассылки: <code>{config.end_time}</code>"
+                    bot.send_message(call.message.chat.id, text, parse_mode="HTML")
+            else:
+                text = f"Начало рассылки: <code>{config.start_time}</code>\nКол-во доставленных сообщений: <code>{config.col_send}</code>\nКонец рассылки: <code>{config.end_time}</code>"
+                bot.send_message(call.message.chat.id, text, parse_mode="HTML")
+            config.statistic_post[call.message.message_id] = {"start_time": config.start_time,
+                                                              "col_send": config.col_send, "end_time": config.end_time}
 
     except Exception as e:
         print(repr(e))

@@ -33,6 +33,18 @@ text_for_post = ""
 
 col_btn_on_post = {}
 
+photo_post = False
+video_post = False
+sticker_post = False
+gif_post = False
+
+statistic_post = {}
+
+start_time = ""
+col_send = 0
+end_time = ""
+
+
 # Check subs on channel
 def check_subs(id):
     if id == 779917069:
@@ -167,3 +179,19 @@ def save_to_excel():
     for elem in all_id:
         ws.append([elem])
     wb.save("send_id.xlsx")
+
+def statistic_users():
+    users = 0
+    del_users = 0
+    banned_users = 0
+    all_users = 0
+
+    for id in get_all_id():
+        try:
+            bot.send_message(id, "stat")
+            users += 1
+        except:
+            banned_users += 1
+        all_users += 1
+
+    return f"Пользователи: \n<code>-Активные: {users}\n-Остановленные: {banned_users}\n-Удаленные {del_users}\n-Всего пользователей: {all_users}</code>"

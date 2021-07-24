@@ -51,17 +51,20 @@ stop = types.InlineKeyboardButton("Завершить", callback_data="cancel")
 
 stop_inline_markup.add(stop)
 
+view_stat_markup = types.InlineKeyboardMarkup()
+view_btn = types.InlineKeyboardButton("Статистика", callback_data="view_stat")
+view_stat_markup.add(view_btn)
+
 """ REPLY KEYBOARD """
 # start spam
 start_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 start_spam_btn = types.KeyboardButton("Запустить спам")
 statistic_btn = types.KeyboardButton("Статистика")
-statistic_users_btn = types.KeyboardButton("Общая статистика")
 subs_btn = types.KeyboardButton("Подписка")
 
 start_markup.add(start_spam_btn)
 start_markup.add(statistic_btn, subs_btn)
-start_markup.add(statistic_users_btn)
+
 
 # for admin
 btn_for_admin = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -80,8 +83,23 @@ stop_markup.add(stop)
 admin_panel = types.ReplyKeyboardMarkup(resize_keyboard=True)
 get_id = types.KeyboardButton("Выгрузить все ID")
 send_post = types.KeyboardButton("Начать рассылку")
+get_statistic_of_all_user = types.KeyboardButton("Статистика использования")
 
 
-admin_panel.add(get_id)
 admin_panel.add(send_post)
+admin_panel.add(get_id)
+admin_panel.add(get_statistic_of_all_user)
 admin_panel.add(stop)
+
+# for post send
+post_send = types.ReplyKeyboardMarkup(resize_keyboard=True)
+send_post_with_photo = types.KeyboardButton("Пост с фото")
+send_post_with_video = types.KeyboardButton("Пост с видео")
+send_post_with_gif = types.KeyboardButton("Пост с гифкой")
+send_post_with_sticker = types.KeyboardButton("Пост со стикеором")
+send_post_without_photo = types.KeyboardButton("Пост без фото")
+forward_post = types.KeyboardButton("Переслать пост")
+post_send.add(send_post_with_photo,send_post_without_photo)
+post_send.add(send_post_with_video, send_post_with_gif)
+post_send.add(forward_post)
+post_send.add(stop)
