@@ -41,9 +41,9 @@ def handler(message):
     if message.text == "Статистика":
         data = config.get_statistic(message.chat.id)
         if data[3] == 0:
-            text = "Статистика пользователя.\n<code>Aктуальная дата {}</code>\nid пользователя: <code>{}</code>\nПодписка: <code>Отсутствует</code>\nCмс отправленно: <code>{}</code>".format(data[1], data[0],data[4])
+            text = "Статистика пользователя.\n<code>Aктуальная дата {}</code>\nid пользователя: <code>{}</code>\nПодписка: <code>Отсутствует</code>\nCмс отправленно: <code>{}</code>".format(data[1], data[0],data[3])
         else:
-            text = "Статистика пользователя.\n<code>Aктуальная дата {}</code>\nid пользователя: <code>{}</code>\nПодписка: <code>действительна {} дня|день</code>\nCмс отправленно: <code>{}</code>".format(data[1],data[0], data[3], data[4])
+            text = "Статистика пользователя.\n<code>Aктуальная дата {}</code>\nid пользователя: <code>{}</code>\nПодписка: <code>действительна {} дня|день</code>\nCмс отправленно: <code>{}</code>".format(data[1],data[0], data[2], data[3])
 
         bot.send_message(message.chat.id, text, reply_markup=button.stop_markup, parse_mode="HTML")
 
